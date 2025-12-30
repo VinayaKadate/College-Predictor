@@ -3,31 +3,74 @@ from flask_cors import CORS
 from routes.predict_route import predict_bp
 import pandas as pd
 import os
-from routes.college_directory import college_directory_bp 
+import logging
+import sys
 
-# ✅ ADD THIS IMPORT
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__)
+
+# SIMPLIFIED CORS CONFIGURATION - FIX FOR DUPLICATE HEADERS
+CORS(app, 
+     origins="http://localhost:5173",  # Single string, not list
+     supports_credentials=True,
+     allow_headers=["Content-Type", "Authorization", "Accept", "X-Requested-With"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+
+# Try to import blueprints with error handling
+try:
+    from routes.college_directory import college_directory_bp
+    COLLEGE_DIRECTORY_AVAILABLE = True
+    logger.info("✅ College directory blueprint imported successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ College directory blueprint not available: {e}")
+    COLLEGE_DIRECTORY_AVAILABLE = False
+    college_directory_bp = None
+
+try:
+    from routes.chat_routes import chat_bp
+    CHAT_ROUTES_AVAILABLE = True
+    logger.info("✅ Chat routes blueprint imported successfully")
+except ImportError as e:
+    logger.warning(f"⚠️ Chat routes blueprint not available: {e}")
+    CHAT_ROUTES_AVAILABLE = False
+    chat_bp = None
+
 try:
     from routes.college_comparison_route import comparison_bp
     COMPARISON_AVAILABLE = True
-    print("✅ Comparison blueprint imported successfully")
+    logger.info("✅ Comparison blueprint imported successfully")
 except ImportError as e:
-    print(f"⚠️ Comparison blueprint not available: {e}")
+    logger.warning(f"⚠️ Comparison blueprint not available: {e}")
     COMPARISON_AVAILABLE = False
     comparison_bp = None
 
-app = Flask(__name__)
-CORS(app)
+# Register blueprints if available
+try:
+    app.register_blueprint(predict_bp)
+    logger.info("✅ Prediction blueprint registered")
+except Exception as e:
+    logger.error(f"❌ Failed to register prediction blueprint: {e}")
 
-# Register blueprints
-app.register_blueprint(predict_bp)
-app.register_blueprint(college_directory_bp, url_prefix='/api')
-
-# ✅ ADD COMPARISON BLUEPRINT REGISTRATION
-if COMPARISON_AVAILABLE and comparison_bp:
-    app.register_blueprint(comparison_bp)
-    print("✅ Comparison blueprint registered")
+if COLLEGE_DIRECTORY_AVAILABLE and college_directory_bp:
+    app.register_blueprint(college_directory_bp, url_prefix='/api')
+    logger.info("✅ College directory blueprint registered")
 else:
-    print("⚠️ Comparison blueprint not registered")
+    logger.warning("⚠️ College directory blueprint not registered")
+
+if CHAT_ROUTES_AVAILABLE and chat_bp:
+    app.register_blueprint(chat_bp, url_prefix='/api')
+    logger.info("✅ Chat blueprint registered")
+else:
+    logger.warning("⚠️ Chat blueprint not registered")
+
+if COMPARISON_AVAILABLE and comparison_bp:
+    app.register_blueprint(comparison_bp, url_prefix='/api')
+    logger.info("✅ Comparison blueprint registered")
+else:
+    logger.warning("⚠️ Comparison blueprint not registered")
 
 @app.route('/', methods=['GET'])
 def home():
@@ -40,7 +83,10 @@ def home():
         'filter_colleges': 'GET /api/colleges/filter',
         'college_details': 'GET /api/colleges/<code>/details',
         'college_stats': 'GET /api/colleges/stats',
-        'predict_cutoff': 'POST /api/colleges/<code>/predict'
+        'predict_cutoff': 'POST /api/colleges/<code>/predict',
+        'chat': 'POST /api/chat',
+        'chat_clear': 'POST /api/chat/clear',
+        'chat_status': 'GET /api/chat/status'
     }
     
     # ✅ ADD COMPARISON ENDPOINTS IF AVAILABLE
@@ -58,15 +104,59 @@ def home():
         'status': 'running',
         'version': '1.0.0',
         'endpoints': endpoints,
-        'comparison_available': COMPARISON_AVAILABLE
+        'services': {
+            'comparison': COMPARISON_AVAILABLE,
+            'college_directory': COLLEGE_DIRECTORY_AVAILABLE,
+            'chat': CHAT_ROUTES_AVAILABLE,
+            'prediction': True
+        }
     })
 
 @app.route('/api/health', methods=['GET'])
 def health():
+    # Check if chat service is working by trying to import
+    gemini_available = False
+    chat_available = False
+    
+    if CHAT_ROUTES_AVAILABLE:
+        try:
+            # First check if chat_routes module exists and has GEMINI_AVAILABLE
+            from routes import chat_routes
+            chat_available = True
+            
+            # Try to get GEMINI_AVAILABLE from the module
+            if hasattr(chat_routes, 'GEMINI_AVAILABLE'):
+                gemini_available = chat_routes.GEMINI_AVAILABLE
+                logger.info(f"✅ Gemini available status: {gemini_available}")
+            else:
+                logger.warning("⚠️ GEMINI_AVAILABLE not found in chat_routes module")
+                gemini_available = False
+        except ImportError as e:
+            logger.error(f"❌ Failed to import chat_routes module: {e}")
+            chat_available = False
+            gemini_available = False
+        except Exception as e:
+            logger.error(f"❌ Error checking chat service: {e}")
+            chat_available = False
+            gemini_available = False
+    else:
+        logger.info("ℹ️ Chat routes not available")
+        chat_available = False
+        gemini_available = False
+    
     return jsonify({
         'status': 'healthy',
         'message': 'Backend server is operational',
-        'comparison_available': COMPARISON_AVAILABLE
+        'services': {
+            'comparison': COMPARISON_AVAILABLE,
+            'college_directory': COLLEGE_DIRECTORY_AVAILABLE,
+            'chat_routes': CHAT_ROUTES_AVAILABLE,
+            'chat_available': chat_available,
+            'gemini_ai': gemini_available,
+            'prediction': True
+        },
+        'timestamp': pd.Timestamp.now().isoformat(),
+        'cors_origin': 'http://localhost:5173'
     })
 
 @app.route('/api/test-blueprint', methods=['GET'])
@@ -74,11 +164,18 @@ def test_blueprint():
     return jsonify({
         'success': True,
         'message': 'Blueprint is working',
-        'comparison_available': COMPARISON_AVAILABLE,
+        'services': {
+            'comparison': COMPARISON_AVAILABLE,
+            'college_directory': COLLEGE_DIRECTORY_AVAILABLE,
+            'chat': CHAT_ROUTES_AVAILABLE
+        },
         'endpoints': [
             '/api/colleges/directory',
             '/api/colleges/filter',
-            '/api/colleges/stats'
+            '/api/colleges/stats',
+            '/api/chat',
+            '/api/chat/status',
+            '/api/chat/clear'
         ]
     })
 
@@ -88,19 +185,16 @@ def get_college_dataset():
         # Use forward slashes or raw string for Windows path
         file_path = 'backend/data/flattened_CAP_data done.xlsx'
         
-        # Alternative: Use raw string for Windows path
-        # file_path = r'backend\data\flattened_CAP_data done.xlsx'
-        
-        print(f"📂 Looking for file at: {file_path}")
-        print(f"📁 Current working directory: {os.getcwd()}")
-        print(f"🔍 File exists: {os.path.exists(file_path)}")
+        logger.info(f"📂 Looking for file at: {file_path}")
+        logger.info(f"📁 Current working directory: {os.getcwd()}")
+        logger.info(f"🔍 File exists: {os.path.exists(file_path)}")
         
         if not os.path.exists(file_path):
             # Try absolute path
             absolute_path = 'D:/CET_Prediction/cet-web-app/backend/data/flattened_CAP_data done.xlsx'
             if os.path.exists(absolute_path):
                 file_path = absolute_path
-                print(f"✅ Found file at absolute path: {file_path}")
+                logger.info(f"✅ Found file at absolute path: {file_path}")
             else:
                 return jsonify({
                     'success': False,
@@ -110,7 +204,7 @@ def get_college_dataset():
                 }), 404
         
         # Read the Excel file
-        print("📊 Reading Excel file...")
+        logger.info("📊 Reading Excel file...")
         df = pd.read_excel(file_path)
         
         # Basic data cleaning
@@ -119,7 +213,7 @@ def get_college_dataset():
         # Convert to JSON
         data = df.to_dict('records')
         
-        print(f"✅ Successfully loaded {len(data)} records")
+        logger.info(f"✅ Successfully loaded {len(data)} records")
         
         return jsonify({
             'success': True,
@@ -130,7 +224,7 @@ def get_college_dataset():
         })
         
     except Exception as e:
-        print(f"❌ Error loading dataset: {str(e)}")
+        logger.error(f"❌ Error loading dataset: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -176,6 +270,7 @@ def directory_stats():
         })
         
     except Exception as e:
+        logger.error(f"Error in directory_stats: {e}")
         return jsonify({
             'success': False,
             'error': str(e),
@@ -194,26 +289,161 @@ def debug_compare():
         'compare_endpoint': 'POST /api/compare/compare' if COMPARISON_AVAILABLE else 'Not available'
     })
 
+# Test CORS headers endpoint
+@app.route('/api/cors-test', methods=['GET', 'OPTIONS'])
+def cors_test():
+    """Test CORS headers directly"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'OK'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        return response, 200
+    
+    headers = dict(request.headers)
+    
+    return jsonify({
+        'success': True,
+        'message': 'CORS test endpoint',
+        'request_headers': headers,
+        'cors_info': {
+            'allowed_origin': 'http://localhost:5173',
+            'allowed_methods': ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            'allowed_headers': ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
+        }
+    })
+
+# API documentation endpoint
+@app.route('/api/docs', methods=['GET'])
+def api_docs():
+    """API documentation"""
+    docs = {
+        'chat_service': {
+            'description': 'Google Gemini AI-powered college admission chatbot',
+            'available': CHAT_ROUTES_AVAILABLE,
+            'endpoints': {
+                'chat': {
+                    'method': 'POST',
+                    'url': '/api/chat',
+                    'body': {
+                        'message': 'string (required)',
+                        'history': 'array of previous messages (optional)'
+                    },
+                    'response': {
+                        'response': 'string',
+                        'success': 'boolean'
+                    }
+                },
+                'chat_status': {
+                    'method': 'GET',
+                    'url': '/api/chat/status',
+                    'response': {
+                        'available': 'boolean',
+                        'service': 'string'
+                    }
+                },
+                'clear_chat': {
+                    'method': 'POST',
+                    'url': '/api/chat/clear',
+                    'response': {
+                        'message': 'string',
+                        'success': 'boolean'
+                    }
+                }
+            }
+        },
+        'prediction_service': {
+            'endpoints': {
+                'predict': 'POST /api/predict',
+                'health': 'GET /api/health'
+            }
+        },
+        'college_data': {
+            'endpoints': {
+                'dataset': 'GET /api/colleges/dataset',
+                'directory': 'GET /api/colleges/directory',
+                'filter': 'GET /api/colleges/filter'
+            }
+        }
+    }
+    
+    if COMPARISON_AVAILABLE:
+        docs['comparison_service'] = {
+            'endpoints': {
+                'search': 'GET /api/compare/colleges?query=',
+                'compare': 'POST /api/compare/compare'
+            }
+        }
+    
+    return jsonify(docs)
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        'success': False,
+        'error': 'Endpoint not found',
+        'message': 'Check the API documentation at GET /',
+        'available_endpoints': {
+            'home': 'GET /',
+            'health': 'GET /api/health',
+            'docs': 'GET /api/docs',
+            'chat_status': 'GET /api/chat/status'
+        }
+    }), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({
+        'success': False,
+        'error': 'Internal server error',
+        'message': 'Please check server logs'
+    }), 500
+
+# Print all registered routes for debugging
+def print_registered_routes():
+    print("\n" + "="*60)
+    print("📋 REGISTERED ROUTES:")
+    print("="*60)
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods - {'OPTIONS', 'HEAD'}))
+        print(f"  {rule.rule:50} -> {rule.endpoint:30} [{methods}]")
+    print("="*60)
+
 if __name__ == '__main__':
     print("\n" + "="*50)
     print("🚀 CET College Predictor - Backend Server")
     print("="*50)
     print("📍 Server: http://localhost:5000")
-    print("📊 API Docs: http://localhost:5000/")
+    print("🌐 Frontend: http://localhost:5173")
+    print("🔧 CORS Origin: http://localhost:5173")
+    print("📚 API Docs: http://localhost:5000/")
     print("🎓 Dataset Endpoint: GET /api/colleges/dataset")
     print("📚 College Directory: GET /api/colleges/directory")
-    print("🔍 Check directory: GET /api/colleges/directory/stats")
+    
+    if CHAT_ROUTES_AVAILABLE:
+        print("\n🤖 Chat Assistant:")
+        print("   Status:      GET http://localhost:5000/api/chat/status")
+        print("   Chat:        POST http://localhost:5000/api/chat")
+        print("   Clear:       POST http://localhost:5000/api/chat/clear")
+        print("   Test:        GET http://localhost:5000/api/chat/test")
+    else:
+        print("\n⚠️  Chat assistant routes not available")
+        print("   Check if 'routes/chat_routes.py' exists")
     
     # ✅ ADD COMPARISON INFO
     if COMPARISON_AVAILABLE:
         print("\n🔍 Comparison Service:")
-        print("   Test:        http://localhost:5000/api/compare/test")
-        print("   Health:      http://localhost:5000/api/compare/health")
-        print("   Search:      http://localhost:5000/api/compare/colleges?query=")
+        print("   Test:        GET http://localhost:5000/api/compare/test")
+        print("   Health:      GET http://localhost:5000/api/compare/health")
+        print("   Search:      GET http://localhost:5000/api/compare/colleges?query=")
         print("   Compare:     POST http://localhost:5000/api/compare/compare")
     else:
         print("\n⚠️  Comparison service not available")
-        print("   Check if 'routes/college_comparison_route.py' exists")
+    
+    print("\n📊 Services Status:")
+    print(f"   • Comparison Service: {'✅' if COMPARISON_AVAILABLE else '❌'}")
+    print(f"   • College Directory: {'✅' if COLLEGE_DIRECTORY_AVAILABLE else '❌'}")
+    print(f"   • Chat Routes: {'✅' if CHAT_ROUTES_AVAILABLE else '❌'}")
+    print(f"   • Prediction Model: ✅")
     
     print("="*50 + "\n")
     
@@ -222,13 +452,30 @@ if __name__ == '__main__':
     abs_path = 'D:/CET_Prediction/cet-web-app/backend/data/Colleges_URL.xlsx'
     
     if os.path.exists(dir_path):
-        print(f"✅ College directory file found: {dir_path}")
+        logger.info(f"✅ College directory file found: {dir_path}")
     elif os.path.exists(abs_path):
-        print(f"✅ College directory file found (absolute): {abs_path}")
+        logger.info(f"✅ College directory file found (absolute): {abs_path}")
     else:
-        print(f"⚠️  College directory file not found. Expected at:")
-        print(f"   - {dir_path}")
-        print(f"   - {abs_path}")
-        print("   Make sure Colleges_URL.xlsx is in the backend/data/ folder")
+        logger.warning(f"⚠️  College directory file not found. Expected at:")
+        logger.warning(f"   - {dir_path}")
+        logger.warning(f"   - {abs_path}")
     
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    # Print all registered routes
+    print_registered_routes()
+    
+    # Test if chat service can be initialized
+    if CHAT_ROUTES_AVAILABLE:
+        try:
+            from routes.chat_routes import GEMINI_AVAILABLE
+            if GEMINI_AVAILABLE:
+                logger.info("✅ Gemini chat service is configured and available")
+            else:
+                logger.warning("⚠️ Gemini service not configured (fallback mode active)")
+                logger.warning("   To enable Gemini AI:")
+                logger.warning("   1. Get API key from: https://makersuite.google.com/app/apikey")
+                logger.warning("   2. Create .env file with GEMINI_API_KEY=your_key")
+                logger.warning("   3. Install: pip install google-generativeai python-dotenv")
+        except Exception as e:
+            logger.error(f"❌ Error checking Gemini status: {e}")
+    
+    app.run(debug=True, port=5000, host='0.0.0.0', use_reloader=True)
