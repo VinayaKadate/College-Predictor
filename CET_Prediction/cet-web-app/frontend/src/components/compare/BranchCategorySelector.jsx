@@ -1,141 +1,190 @@
-import React from 'react';
-import { Loader2, BookOpen, Tag } from 'lucide-react';
+// src/components/compare/BranchCategorySelector.jsx
+import React, { useState, useEffect } from 'react';
+import { GitBranch, Users, AlertCircle, Loader2 } from 'lucide-react';
+import { collegeApi } from '../../services/collegeApi';
 
-export default function BranchCategorySelector({
-  branches,
+const BranchCategorySelector = ({
+  selectedColleges,
   selectedBranch,
-  onBranchChange,
   selectedCategory,
+  onBranchChange,
   onCategoryChange,
-  metric,
-  onMetricChange,
-  loading,
-  disabled
-}) {
-  const categories = [
-    { value: 'OPEN', label: 'OPEN', color: 'from-blue-500 to-blue-600' },
-    { value: 'OBC', label: 'OBC', color: 'from-green-500 to-green-600' },
-    { value: 'SC', label: 'SC', color: 'from-purple-500 to-purple-600' },
-    { value: 'ST', label: 'ST', color: 'from-pink-500 to-pink-600' },
-    { value: 'EWS', label: 'EWS', color: 'from-indigo-500 to-indigo-600' },
-    { value: 'TFWS', label: 'TFWS', color: 'from-orange-500 to-orange-600' }
-  ];
+}) => {
+  const [branches, setBranches] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const metrics = [
-    { value: 'closing_percentile', label: 'Percentile' },
-    { value: 'closing_rank', label: 'Rank' }
-  ];
+  useEffect(() => {
+    fetchCommonBranches();
+  }, [selectedColleges]);
+
+  useEffect(() => {
+    if (selectedBranch) {
+      fetchCommonCategories();
+    } else {
+      setCategories([]);
+      onCategoryChange('');
+    }
+  }, [selectedBranch, selectedColleges]);
+
+  const fetchCommonBranches = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const collegeCodes = selectedColleges.map(c => c.college_code);
+      console.log('🌿 Fetching common branches for:', collegeCodes);
+      
+      const data = await collegeApi.getBranches(collegeCodes);
+      
+      console.log('🌿 Available branches:', data);
+      setBranches(Array.isArray(data) ? data : []);
+      
+      // Reset selections if current branch is not available
+      if (selectedBranch && !data.includes(selectedBranch)) {
+        onBranchChange('');
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+      setError('Failed to load branches');
+      setBranches([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCommonCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const collegeCodes = selectedColleges.map(c => c.college_code);
+      console.log('📋 Fetching common categories for:', collegeCodes, selectedBranch);
+      
+      const data = await collegeApi.getCategories(collegeCodes, selectedBranch);
+      
+      console.log('📋 Available categories:', data);
+      setCategories(Array.isArray(data) ? data : []);
+      
+      // Reset category if current one is not available
+      if (selectedCategory && !data.includes(selectedCategory)) {
+        onCategoryChange('');
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setError('Failed to load categories');
+      setCategories([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && branches.length === 0 && categories.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-6 bg-gray-50 rounded-lg">
+        <Loader2 className="w-5 h-5 animate-spin text-blue-600 mr-2" />
+        <span className="text-gray-600">Loading options...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl rounded-2xl border border-gray-200/50 p-6 shadow-lg">
-      <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
-        <BookOpen className="w-5 h-5 text-orange-600" />
-        Comparison Settings
-      </h2>
+    <div className="space-y-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-red-800 font-medium text-sm">Error</p>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        </div>
+      )}
 
-      {/* Branch Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
+      {/* Branch Selector */}
+      <div>
+        <label htmlFor="branch-selector" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+          <GitBranch className="w-4 h-4" />
           Select Branch
+          {branches.length > 0 && (
+            <span className="text-gray-500 font-normal">
+              ({branches.length} common {branches.length === 1 ? 'branch' : 'branches'})
+            </span>
+          )}
         </label>
-        
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-orange-600 animate-spin" />
-            <span className="ml-2 text-sm text-gray-600">Loading branches...</span>
-          </div>
-        ) : branches.length === 0 ? (
-          <div className="text-center py-6 px-4 bg-gray-50 rounded-xl border border-gray-200">
-            <p className="text-sm text-gray-500">
-              Select at least 2 colleges to view available branches
-            </p>
-          </div>
-        ) : (
-          <select
-            value={selectedBranch}
-            onChange={(e) => onBranchChange(e.target.value)}
-            disabled={disabled}
-            className="w-full px-4 py-3.5 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-medium"
-          >
-            <option value="">Choose a branch...</option>
-            {branches.map((branch) => (
-              <option key={branch.branch_code} value={branch.branch_code}>
-                {branch.branch_name}
-              </option>
-            ))}
-          </select>
-        )}
-        
-        {branches.length > 0 && (
-          <p className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-            <Tag className="w-3 h-3" />
-            {branches.length} branch{branches.length !== 1 ? 'es' : ''} available
+        <select
+          id="branch-selector"
+          value={selectedBranch}
+          onChange={(e) => onBranchChange(e.target.value)}
+          disabled={loading || branches.length === 0}
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+        >
+          <option value="">
+            {branches.length === 0 
+              ? 'No common branches available' 
+              : 'Choose a branch...'}
+          </option>
+          {branches.map((branch) => (
+            <option key={branch} value={branch}>
+              {branch}
+            </option>
+          ))}
+        </select>
+        {branches.length === 0 && !loading && (
+          <p className="mt-1 text-xs text-gray-500">
+            The selected colleges don't have any branches in common
           </p>
         )}
       </div>
 
-      {/* Category Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
+      {/* Category Selector */}
+      <div>
+        <label htmlFor="category-selector" className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+          <Users className="w-4 h-4" />
           Select Category
+          {categories.length > 0 && (
+            <span className="text-gray-500 font-normal">
+              ({categories.length} common {categories.length === 1 ? 'category' : 'categories'})
+            </span>
+          )}
         </label>
-        
-        <div className="grid grid-cols-3 gap-2.5">
+        <select
+          id="category-selector"
+          value={selectedCategory}
+          onChange={(e) => onCategoryChange(e.target.value)}
+          disabled={!selectedBranch || loading || categories.length === 0}
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+        >
+          <option value="">
+            {!selectedBranch
+              ? 'Select a branch first'
+              : categories.length === 0
+                ? 'No common categories available'
+                : 'Choose a category...'}
+          </option>
           {categories.map((category) => (
-            <button
-              key={category.value}
-              onClick={() => onCategoryChange(category.value)}
-              disabled={disabled}
-              className={`px-3 py-3 rounded-xl text-sm font-semibold transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                selectedCategory === category.value
-                  ? `bg-gradient-to-r ${category.color} text-white shadow-lg`
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-              }`}
-            >
-              {category.label}
-            </button>
+            <option key={category} value={category}>
+              {category}
+            </option>
           ))}
-        </div>
-        
-        <p className="mt-2 text-xs text-gray-500">
-          Selected: <span className="font-semibold text-gray-700">{selectedCategory}</span>
-        </p>
+        </select>
+        {selectedBranch && categories.length === 0 && !loading && (
+          <p className="mt-1 text-xs text-gray-500">
+            No common categories found for this branch across selected colleges
+          </p>
+        )}
       </div>
 
-      {/* Metric Toggle */}
-      <div className="mb-6">
-        <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <div className="w-2 h-2 bg-orange-600 rounded-full"></div>
-          Display Metric
-        </label>
-        
-        <div className="grid grid-cols-2 gap-3">
-          {metrics.map((metricOption) => (
-            <button
-              key={metricOption.value}
-              onClick={() => onMetricChange(metricOption.value)}
-              disabled={disabled}
-              className={`px-4 py-3.5 rounded-xl text-sm font-semibold transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                metric === metricOption.value
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/30'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-              }`}
-            >
-              {metricOption.label}
-            </button>
-          ))}
+      {/* Info Message */}
+      {branches.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <p className="text-xs text-blue-800">
+            💡 Only branches and categories available in <strong>all selected colleges</strong> are shown
+          </p>
         </div>
-      </div>
-
-      {/* Info Box */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-        <p className="text-xs text-gray-700 leading-relaxed">
-          <span className="font-semibold text-blue-700">💡 Tip:</span> Lower percentile values indicate more competitive cutoffs. 
-          Compare trends across years to identify which colleges are becoming more or less competitive.
-        </p>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default BranchCategorySelector;
