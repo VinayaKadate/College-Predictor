@@ -7,8 +7,8 @@ from flask_jwt_extended import JWTManager
 from routes.predict_route import predict_bp
 from routes.college_directory import college_directory_bp
 from routes.college_comparison_routes import college_comparison_bp
-# from routes.chatbot_route import chatbot_bp
-# from routes.resource_vault_route import resource_vault_bp  # ✅ NEW: Resource Vault import
+from routes.chatbot_route import chatbot_bp
+from routes.resource_vault_route import resource_vault_bp  # ✅ NEW: Resource Vault import
 import pandas as pd
 import os
 
@@ -55,8 +55,8 @@ print("📋 Registering blueprints...")
 app.register_blueprint(predict_bp)
 app.register_blueprint(college_directory_bp, url_prefix='/api')
 app.register_blueprint(college_comparison_bp, url_prefix='/api')
-# app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
-# app.register_blueprint(resource_vault_bp)  # ✅ NEW: Register Resource Vault blueprint
+app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
+app.register_blueprint(resource_vault_bp)  # ✅ NEW: Register Resource Vault blueprint
 print("✅ All blueprints registered (including chatbot & resource vault)")
 
 @app.route('/', methods=['GET'])
