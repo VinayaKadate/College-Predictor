@@ -1,30 +1,21 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
     host: true,
-    cors: true
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          charts: ['recharts'],
-          firebase: ['react-firebase-hooks'],
-        },
-      },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+      include: [/react-firebase-hooks/, /node_modules/],
     },
   },
-  resolve: {
-    alias: {
-      '@': '/src'
-    }
-  }
+  optimizeDeps: {
+    include: ['react-firebase-hooks'],
+  },
 })
