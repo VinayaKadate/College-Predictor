@@ -30,7 +30,7 @@ export default function LandingPage() {
               <a href="#features" className="text-gray-700 hover:text-blue-600 transition">Features</a>
               <a href="#how-it-works" className="text-gray-700 hover:text-blue-600 transition">How It Works</a>
               <a href="#testimonials" className="text-gray-700 hover:text-blue-600 transition">Testimonials</a>
-              <button onClick={() => navigate('https://college-predictor-5qfg.vercel.app/login')} className="text-gray-700 hover:text-blue-600 transition">
+              <button onClick={() => navigate('/login')} className="text-gray-700 hover:text-blue-600 transition">
                 Login
               </button>
               <button onClick={() => navigate('/signup')} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-full hover:shadow-lg transition">

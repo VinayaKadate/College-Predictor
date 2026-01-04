@@ -63,10 +63,10 @@ export default function LandingPage() {
               <a href="#features" className="text-gray-700 hover:text-blue-600 transition-colors duration-300">Features</a>
               <a href="#how-it-works" className="text-gray-700 hover:text-blue-600 transition-colors duration-300">How It Works</a>
               <a href="#testimonials" className="text-gray-700 hover:text-blue-600 transition-colors duration-300">Testimonials</a>
-              <button onClick={() => handleNavigation('/login')} className="text-gray-700 hover:text-blue-600 transition-colors duration-300">
+              <button onClick={() => handleNavigation('https://college-predictor-d2xc.onrender.com/login')} className="text-gray-700 hover:text-blue-600 transition-colors duration-300">
                 Login
               </button>
-              <button onClick={() => handleNavigation('/signup')} className="relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-full hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105">
+              <button onClick={() => handleNavigation('https://college-predictor-d2xc.onrender.com/signup')} className="relative bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2 rounded-full hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105">
                 Get Started
               </button>
             </div>
