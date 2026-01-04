@@ -6,26 +6,25 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    strictPort: true,
-    host: 'localhost',
-    cors: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('Proxy error:', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Proxying request to:', req.url);
-            // Remove the Origin header to avoid CORS issues
-            proxyReq.removeHeader('Origin');
-          });
-        }
-      }
+    host: true,
+    cors: true
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['recharts'],
+          firebase: ['react-firebase-hooks'],
+        },
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': '/src'
     }
   }
 })
