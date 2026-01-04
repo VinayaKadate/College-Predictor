@@ -11,7 +11,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://college-predictor-d2xc.onrender.com/';
 
 export default function OptionFormBuilder() {
   const navigate = useNavigate();

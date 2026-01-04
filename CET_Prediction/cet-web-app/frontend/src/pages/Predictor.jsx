@@ -9,7 +9,7 @@ import {
   User, GraduationCap, List, AlertCircle, Edit
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://college-predictor-d2xc.onrender.com/';
 
 export default function Predictor() {
   const [user, authLoading] = useAuthState(auth);

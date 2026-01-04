@@ -13,7 +13,7 @@ import {
 import CollegeCard from '../components/CollegeDirectory/Card';
 import Filters from '../components/CollegeDirectory/Filters';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://college-predictor-d2xc.onrender.com/';
 
 // Main College Directory Component
 export default function CollegeDirectory() {
