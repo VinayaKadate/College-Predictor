@@ -12,7 +12,7 @@
 
 **CET College Predictor** is an intelligent full-stack platform that revolutionizes college admissions for Maharashtra CET aspirants. Combining **machine learning predictions** with **Google Gemini AI** assistance, it provides data-driven admission decisions.
 
-> **Live Demo**: [Frontend](https://college-predictor.vercel.app) | **API**: [Backend](https://college-predictor-d2xc.onrender.com/api/health)
+> **Live Demo**: [Frontend](https://collegepredictor-b49c2.web.app) | **API**: [Backend](https://college-predictor-d2xc.onrender.com)
 
 ---
 
